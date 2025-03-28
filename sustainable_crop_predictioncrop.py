@@ -64,7 +64,7 @@ app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
 # GitHub raw dataset URL (replace with your actual raw GitHub URL)
-DATASET_PATH = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/filtered_crop_effects_dataset.csv"
+DATASET_PATH = "https://raw.githubusercontent.com/kundu2002/crop-recommendation-app/refs/heads/main/filtered_crop_effects_dataset.csv"
 
 # Prepare Model
 MODEL, SCALER, ENCODER = prepare_crop_prediction_model(DATASET_PATH)

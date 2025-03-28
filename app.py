@@ -16,37 +16,62 @@ MODEL = None
 SCALER = None
 ENCODER = None
 
-# Dataset path
-DATASET_PATH = "https://raw.githubusercontent.com/kundu2002/crop-recommendation-app/refs/heads/main/filtered_crop_effects_dataset.csv"
+# Dataset path - using local file
+DATASET_PATH = "assets/data/filtered_crop_effects_dataset.csv"
 
 def load_model():
     global MODEL, SCALER, ENCODER
     
     try:
+        print("Starting model loading process...")
+        print(f"Attempting to load dataset from: {DATASET_PATH}")
+        
+        # Check if file exists
+        if not os.path.exists(DATASET_PATH):
+            print(f"Error: Dataset file not found at {DATASET_PATH}")
+            return False
+            
         # Load the dataset
         df = pd.read_csv(DATASET_PATH)
+        print(f"Dataset loaded successfully. Shape: {df.shape}")
+        print("Columns in dataset:", df.columns.tolist())
         
         # Prepare features
-        X = df[['N', 'P', 'K', 'ph', 'N_P_Ratio', 'P_K_Ratio', 'N_PH_Product']]
+        required_columns = ['N_Effect', 'P_Effect', 'K_Effect', 'pH_Effect']
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        
+        if missing_columns:
+            print("Missing required columns:", missing_columns)
+            return False
+            
+        X = df[required_columns]
         y = df['Crop']
+        
+        print("Features prepared successfully")
         
         # Initialize and fit scaler
         SCALER = StandardScaler()
         X_scaled = SCALER.fit_transform(X)
+        print("Scaler fitted successfully")
         
         # Initialize and train model
         MODEL = RandomForestClassifier(n_estimators=100, random_state=42)
         MODEL.fit(X_scaled, y)
+        print("Model trained successfully")
         
         # Create label encoder mapping
         unique_crops = sorted(y.unique())
         ENCODER = {crop: idx for idx, crop in enumerate(unique_crops)}
         ENCODER = {v: k for k, v in ENCODER.items()}  # Reverse mapping
+        print(f"Label encoder created with {len(ENCODER)} crops")
         
         print("Model loaded successfully!")
         return True
     except Exception as e:
         print(f"Error loading model: {str(e)}")
+        import traceback
+        print("Full traceback:")
+        print(traceback.format_exc())
         return False
 
 @app.route('/predict', methods=['POST'])
@@ -57,20 +82,15 @@ def predict_crops():
         print("Received input data:", data)  # Debug log
         
         # Get adjustment effects from the crop adjustment section
-        n_effect = float(data.get('N_Effect', 0))  # Changed from 'N' to 'N_Effect'
-        p_effect = float(data.get('P_Effect', 0))  # Changed from 'P' to 'P_Effect'
-        k_effect = float(data.get('K_Effect', 0))  # Changed from 'K' to 'K_Effect'
-        ph_effect = float(data.get('PH_Effect', 0))  # Changed from 'ph' to 'PH_Effect'
+        n_effect = float(data.get('N_Effect', 0))
+        p_effect = float(data.get('P_Effect', 0))
+        k_effect = float(data.get('K_Effect', 0))
+        ph_effect = float(data.get('PH_Effect', 0))
 
         print(f"Adjustment effects - N: {n_effect}, P: {p_effect}, K: {k_effect}, pH: {ph_effect}")  # Debug log
 
-        # Feature Engineering for Input
-        n_p_ratio = n_effect / (p_effect + 0.1)
-        p_k_ratio = p_effect / (k_effect + 0.1)
-        n_ph_product = n_effect * ph_effect
-
-        # Create input array
-        input_data = np.array([[n_effect, p_effect, k_effect, ph_effect, n_p_ratio, p_k_ratio, n_ph_product]])
+        # Create input array (no need for additional feature engineering since we're using effects directly)
+        input_data = np.array([[n_effect, p_effect, k_effect, ph_effect]])
         print("Input array shape:", input_data.shape)  # Debug log
 
         # Scale input
@@ -99,84 +119,3 @@ def predict_crops():
     except Exception as e:
         print(f"Error in predict_crops: {str(e)}")  # Debug log
         return jsonify({"error": str(e)}), 400
-
-@app.route('/test', methods=['GET'])
-def test_prediction():
-    """Test route for manual verification - not visible in the main app"""
-    return '''
-    <html>
-        <head>
-            <title>Crop Prediction Test</title>
-            <style>
-                body { font-family: Arial; padding: 20px; }
-                .input-group { margin: 10px 0; }
-                input { padding: 5px; margin: 5px; }
-                button { padding: 10px; background: #4CAF50; color: white; border: none; cursor: pointer; }
-                #result { margin-top: 20px; padding: 10px; border: 1px solid #ccc; }
-            </style>
-        </head>
-        <body>
-            <h2>Crop Prediction Test (Adjustment Effects)</h2>
-            <div class="input-group">
-                <label>N_Effect (Nitrogen Adjustment):</label>
-                <input type="number" id="N_Effect" value="20" step="0.1">
-                <small>Positive for increase, negative for decrease</small>
-            </div>
-            <div class="input-group">
-                <label>P_Effect (Phosphorus Adjustment):</label>
-                <input type="number" id="P_Effect" value="-10" step="0.1">
-                <small>Positive for increase, negative for decrease</small>
-            </div>
-            <div class="input-group">
-                <label>K_Effect (Potassium Adjustment):</label>
-                <input type="number" id="K_Effect" value="15" step="0.1">
-                <small>Positive for increase, negative for decrease</small>
-            </div>
-            <div class="input-group">
-                <label>PH_Effect (pH Adjustment):</label>
-                <input type="number" id="PH_Effect" value="-0.5" step="0.1">
-                <small>Positive for increase, negative for decrease</small>
-            </div>
-            <button onclick="testPrediction()">Test Prediction</button>
-            <div id="result"></div>
-
-            <script>
-                async function testPrediction() {
-                    const data = {
-                        N_Effect: parseFloat(document.getElementById('N_Effect').value),
-                        P_Effect: parseFloat(document.getElementById('P_Effect').value),
-                        K_Effect: parseFloat(document.getElementById('K_Effect').value),
-                        PH_Effect: parseFloat(document.getElementById('PH_Effect').value)
-                    };
-
-                    try {
-                        const response = await fetch('/predict', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify(data)
-                        });
-                        const result = await response.json();
-                        document.getElementById('result').innerHTML = 
-                            '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
-                    } catch (error) {
-                        document.getElementById('result').innerHTML = 
-                            'Error: ' + error.message;
-                    }
-                }
-            </script>
-        </body>
-    </html>
-    '''
-
-@app.route('/', methods=['GET'])
-def health_check():
-    return jsonify({"status": "healthy", "message": "Crop Recommendation API is running"})
-
-if __name__ == '__main__':
-    # Load model before starting the server
-    if load_model():
-        app.run(host='0.0.0.0', port=10000)
-    else:
-        print("Failed to load model. Server not started.")

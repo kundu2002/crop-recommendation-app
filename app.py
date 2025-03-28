@@ -3,6 +3,7 @@ import pandas as pd
 import joblib
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from werkzeug.urls import url_quote_plus  # Update import here
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder

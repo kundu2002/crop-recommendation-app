@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: crop-recommendation-api
+    env: python
+    region: frankfurt
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --worker-tmp-dir /dev/shm ml_server:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.5

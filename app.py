@@ -5,7 +5,6 @@ from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier
-import sklearn
 import os
 import traceback
 import sys
@@ -26,10 +25,10 @@ def load_model():
     
     try:
         print("Starting model loading process...")
+        print(f"Current Working Directory: {os.getcwd()}")
         print(f"Python Version: {sys.version}")
         print(f"Numpy Version: {np.__version__}")
         print(f"Pandas Version: {pd.__version__}")
-        print(f"Scikit-learn Version: {sklearn.__version__}")
         
         # Attempt to download dataset
         try:
@@ -40,12 +39,12 @@ def load_model():
             print(f"Response Headers: {response.headers}")
             
             if response.status_code != 200:
-                print(f"Failed to download dataset. Status code: {response.status_code}")
+                print(f"CRITICAL: Failed to download dataset. Status code: {response.status_code}")
                 print(f"Response Content: {response.text}")
                 return False
             
             # Save content to a temporary file
-            temp_file = "temp_dataset.csv"
+            temp_file = "filtered_crop_effects_dataset.csv"
             with open(temp_file, 'wb') as f:
                 f.write(response.content)
             
@@ -107,9 +106,8 @@ def load_model():
         traceback.print_exc()
         return False
 
-# Rest of the code remains the same as in the previous full implementation
+# Rest of the code remains the same as in the previous implementation
 
-# Modify health check to provide more details
 @app.route('/', methods=['GET'])
 def health_check():
     try:
@@ -122,7 +120,7 @@ def health_check():
             "python_version": sys.version,
             "numpy_version": np.__version__,
             "pandas_version": pd.__version__,
-            "sklearn_version": sklearn.__version__
+            "sklearn_version": "1.2.2"  # Hardcoded version to avoid potential import issues
         })
     except Exception as e:
         print(f"Error in health check: {str(e)}")

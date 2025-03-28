@@ -8,4 +8,10 @@ services:
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
-        value: 3.10.5
+        value: 3.11.11
+    buildFilter:
+      paths:
+        - app.py
+        - requirements.txt
+    healthCheckPath: /
+    autoDeploy: true

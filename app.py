@@ -17,7 +17,7 @@ SCALER = None
 ENCODER = None
 
 # Dataset path - using local file
-DATASET_PATH = "assets/data/filtered_crop_effects_dataset.csv"
+DATASET_PATH = "https://raw.githubusercontent.com/kundu2002/crop-recommendation-app/refs/heads/main/filtered_crop_effects_dataset.csv"
 
 def load_model():
     global MODEL, SCALER, ENCODER

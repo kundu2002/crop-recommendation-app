@@ -7,6 +7,7 @@ from sklearn.ensemble import RandomForestClassifier
 import os
 import urllib.request
 import traceback
+import requests
 
 app = Flask(__name__)
 CORS(app)
@@ -26,23 +27,49 @@ def load_model():
         print("Starting model loading process...")
         print(f"Attempting to load dataset from: {DATASET_PATH}")
         
-        # Use urllib to fetch the dataset from GitHub
+        # Enhanced URL download with more detailed error handling
         try:
-            # Create a temp file to store the dataset
+            # Use requests library for more robust download
+            response = requests.get(DATASET_PATH, timeout=30)
+            
+            # Check if request was successful
+            if response.status_code != 200:
+                print(f"HTTP Error: {response.status_code}")
+                print(f"Response Content: {response.text}")
+                return False
+            
+            # Save content to a temporary file
             temp_file = "temp_dataset.csv"
-            urllib.request.urlretrieve(DATASET_PATH, temp_file)
+            with open(temp_file, 'wb') as f:
+                f.write(response.content)
             
             # Load the dataset
             df = pd.read_csv(temp_file)
             
-            # Clean up
+            # Clean up temp file
             if os.path.exists(temp_file):
                 os.remove(temp_file)
-                
-        except Exception as e:
-            print(f"Error downloading dataset: {str(e)}")
-            return False
             
+        except requests.exceptions.RequestException as req_error:
+            print(f"Network Request Error: {req_error}")
+            return False
+        except Exception as download_error:
+            print(f"Dataset Download Error: {download_error}")
+            
+            # Fallback: Try urllib method
+            try:
+                temp_file = "temp_dataset.csv"
+                urllib.request.urlretrieve(DATASET_PATH, temp_file)
+                df = pd.read_csv(temp_file)
+                
+                # Clean up temp file
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+            except Exception as urllib_error:
+                print(f"Urllib Download Error: {urllib_error}")
+                return False
+        
+        # Debugging: Print dataset details
         print(f"Dataset loaded successfully. Shape: {df.shape}")
         print("Columns in dataset:", df.columns.tolist())
         
@@ -52,34 +79,39 @@ def load_model():
         
         if missing_columns:
             print("Missing required columns:", missing_columns)
+            print("Actual columns available:", df.columns.tolist())
             return False
             
         X = df[required_columns]
         y = df['Crop']
         
-        print("Features prepared successfully")
+        # Add more validation
+        print(f"Features shape: {X.shape}")
+        print(f"Unique crop count: {len(y.unique())}")
         
         # Initialize and fit scaler
         SCALER = StandardScaler()
         X_scaled = SCALER.fit_transform(X)
-        print("Scaler fitted successfully")
         
-        # Initialize and train model
+        # Train model
         MODEL = RandomForestClassifier(n_estimators=100, random_state=42)
         MODEL.fit(X_scaled, y)
-        print("Model trained successfully")
         
         # Create label encoder mapping
         unique_crops = sorted(y.unique())
         ENCODER = {idx: crop for idx, crop in enumerate(unique_crops)}
+        
+        print(f"Model training complete. Unique crops: {unique_crops}")
         print(f"Label encoder created with {len(ENCODER)} crops")
         
-        print("Model loaded successfully!")
         return True
+    
     except Exception as e:
-        print(f"Error loading model: {str(e)}")
-        print("Full traceback:")
-        print(traceback.format_exc())
+        print("Unexpected error in model loading:")
+        print(f"Error Type: {type(e).__name__}")
+        print(f"Error Details: {str(e)}")
+        print("Full Traceback:")
+        traceback.print_exc()
         return False
 
 @app.route('/predict', methods=['POST'])
@@ -88,6 +120,10 @@ def predict_crops():
         # Get input data
         data = request.json
         print("Received input data:", data)  # Debug log
+        
+        # Check if model is loaded
+        if MODEL is None or SCALER is None:
+            return jsonify({"error": "Model not loaded"}), 500
         
         # Get adjustment effects from the crop adjustment section
         n_effect = float(data.get('N_Effect', 0))
